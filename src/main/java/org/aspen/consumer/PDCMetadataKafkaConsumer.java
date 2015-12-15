@@ -1,16 +1,11 @@
 package org.aspen.consumer;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.TextOutputFormat;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.Function2;
-import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.streaming.Duration;
-import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.streaming.api.java.JavaPairDStream;
 import org.apache.spark.streaming.api.java.JavaPairReceiverInputDStream;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
@@ -25,18 +20,20 @@ import java.util.Map;
  * <p/>
  * Remedial Kafka Consumer using Spark Streaming
  * <p/>
- * Usage: PDCKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
+ * Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
  *
  * From Gateway node Example
- * spark-submit --class org.aspen.consumer.PDCKafkaConsumer --deploy-mode client --master local[5]
- *   SparkStreamingKafkaConsumer.jar zk.host:2181 pmugrp pmukafkastream 1
+ * spark-submit --class org.aspen.consumer.PDCMetadataKafkaConsumer --deploy-mode client --master local[5]
+ *   SparkStreamingKafkaConsumer.jar ip-10-6-8-56:2181 metagrp pmukafkastream-metadata 1
  *
  * @TODO run on yarn in distributed mode
  */
-public class PDCKafkaConsumer {
+public class PDCMetadataKafkaConsumer {
+    private static final Logger _LOG = Logger.getLogger(PDCMetadataKafkaConsumer.class);
+
     public static void main(String[] args) {
         if (args.length < 4) {
-            System.err.println("Usage: PDCKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
+            System.err.println("Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
             System.exit(1);
         }
 
@@ -50,10 +47,21 @@ public class PDCKafkaConsumer {
             topicMap.put(topic, numThreads);
         }
 
-        SparkConf conf = new SparkConf().setAppName("PDCKafkaConsumer");
+        SparkConf conf = new SparkConf().setAppName("PDCMetadataKafkaConsumer");
         JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(2000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
-        kfStream.saveAsHadoopFiles("PDC", "in", Text.class, Text.class, TextOutputFormat.class);
+
+        //Filter out un-needed messages
+        //For the first message, the key is an 8-byte integer that represents the current time
+        //and the value is another 8-byte integer that represents the size of the XML message that follows.
+        JavaPairDStream<String, String> fStream = kfStream.filter(new Function<Tuple2<String, String>, Boolean>() {
+            @Override
+            public Boolean call(Tuple2<String, String> tuple) throws Exception {
+                return tuple._2().length() > 16;
+            }
+        });
+
+        fStream.saveAsHadoopFiles("PDC-MD", "in", Text.class, Text.class, TextOutputFormat.class);
 
         ctx.start();
         ctx.awaitTermination();

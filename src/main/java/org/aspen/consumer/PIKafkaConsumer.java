@@ -27,7 +27,7 @@ import java.util.Map;
 public class PIKafkaConsumer {
     public static void main(String[] args) {
         if (args.length < 4) {
-            System.err.println("Usage: PDCKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
+            System.err.println("Usage: PIKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
             System.exit(1);
         }
 
@@ -41,9 +41,12 @@ public class PIKafkaConsumer {
             topicMap.put(topic, numThreads);
         }
 
-        SparkConf conf = new SparkConf().setAppName("PIConsumer");
+        SparkConf conf = new SparkConf().setAppName("PIKafkaConsumer");
         JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(2000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
+        //filter bad data
+        //30/s
+
         kfStream.saveAsHadoopFiles("PI", "in", Text.class, Text.class, TextOutputFormat.class);
 
         ctx.start();
