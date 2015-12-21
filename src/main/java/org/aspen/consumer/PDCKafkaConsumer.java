@@ -28,7 +28,7 @@ import java.util.Map;
  * Usage: PDCKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
  *
  * From Gateway node Example
- * spark-submit --class org.aspen.consumer.PDCKafkaConsumer --deploy-mode client --master local[5]
+ * spark-submit --class org.aspen.consumer.PDCKafkaConsumer --deploy-mode client --master local[2]
  *   SparkStreamingKafkaConsumer.jar zk.host:2181 pmugrp pmukafkastream 1
  *
  * @TODO run on yarn in distributed mode
@@ -51,9 +51,9 @@ public class PDCKafkaConsumer {
         }
 
         SparkConf conf = new SparkConf().setAppName("PDCKafkaConsumer");
-        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(2000));
+        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
-        kfStream.saveAsHadoopFiles("PDC", "in", Text.class, Text.class, TextOutputFormat.class);
+        kfStream.saveAsHadoopFiles("/phasor/pmu/pdc", "in", Text.class, Text.class, TextOutputFormat.class);
 
         ctx.start();
         ctx.awaitTermination();

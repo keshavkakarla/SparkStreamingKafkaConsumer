@@ -23,8 +23,8 @@ import java.util.Map;
  * Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
  *
  * From Gateway node Example
- * spark-submit --class org.aspen.consumer.PDCMetadataKafkaConsumer --deploy-mode client --master local[5]
- *   SparkStreamingKafkaConsumer.jar ip-10-6-8-56:2181 metagrp pmukafkastream-metadata 1
+ * spark-submit --class org.aspen.consumer.PDCMetadataKafkaConsumer --deploy-mode client --master local[2]
+ *   SparkStreamingKafkaConsumer.jar ip-10-6-8-56:2181 metagrp pmumetadatstream 1
  *
  * @TODO run on yarn in distributed mode
  */
@@ -48,7 +48,7 @@ public class PDCMetadataKafkaConsumer {
         }
 
         SparkConf conf = new SparkConf().setAppName("PDCMetadataKafkaConsumer");
-        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(2000));
+        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
 
         //Filter out un-needed messages
@@ -57,11 +57,14 @@ public class PDCMetadataKafkaConsumer {
         JavaPairDStream<String, String> fStream = kfStream.filter(new Function<Tuple2<String, String>, Boolean>() {
             @Override
             public Boolean call(Tuple2<String, String> tuple) throws Exception {
-                return tuple._2().length() > 16;
+                _LOG.debug("LOG: Tuple: " + tuple._1() + ": " + tuple._2());
+                boolean result = tuple._2().length() > 16;
+                System.err.println("Tuple: " + tuple._1() + ": " + tuple._2() + "Result: " + result);
+                return result;
             }
         });
 
-        fStream.saveAsHadoopFiles("PDC-MD", "in", Text.class, Text.class, TextOutputFormat.class);
+        fStream.saveAsHadoopFiles("/phasor/pmumetadata/pdc-md", "in", Text.class, Text.class, TextOutputFormat.class);
 
         ctx.start();
         ctx.awaitTermination();

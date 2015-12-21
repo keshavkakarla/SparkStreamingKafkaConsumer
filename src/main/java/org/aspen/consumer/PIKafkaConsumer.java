@@ -19,7 +19,7 @@ import java.util.Map;
  * Usage: PDCKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
  *
  * From Gateway node Example:
- * spark-submit --class org.aspen.consumer.PIKafkaConsumer --deploy-mode client --master local[5]
+ * spark-submit --class org.aspen.consumer.PIKafkaConsumer --deploy-mode client --master local[2]
  *   SparkStreamingKafkaConsumer.jar zk_host:2181 pigrp pikafkastream 1
  *
  * @TODO run on yarn in distributed mode
@@ -42,12 +42,12 @@ public class PIKafkaConsumer {
         }
 
         SparkConf conf = new SparkConf().setAppName("PIKafkaConsumer");
-        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(2000));
+        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
         //filter bad data
         //30/s
 
-        kfStream.saveAsHadoopFiles("PI", "in", Text.class, Text.class, TextOutputFormat.class);
+        kfStream.saveAsHadoopFiles("/pi/pi-data", "in", Text.class, Text.class, TextOutputFormat.class);
 
         ctx.start();
         ctx.awaitTermination();
