@@ -42,6 +42,7 @@ public class PIKafkaConsumer {
         }
 
         SparkConf conf = new SparkConf().setAppName("PIKafkaConsumer");
+        conf.set("spark.ui.port","4030");
         JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
         //filter bad data

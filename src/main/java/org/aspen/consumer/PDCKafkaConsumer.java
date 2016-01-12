@@ -51,6 +51,7 @@ public class PDCKafkaConsumer {
         }
 
         SparkConf conf = new SparkConf().setAppName("PDCKafkaConsumer");
+        conf.set("spark.ui.port","4040");
         JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
         kfStream.saveAsHadoopFiles("/phasor/pmu/pdc", "in", Text.class, Text.class, TextOutputFormat.class);

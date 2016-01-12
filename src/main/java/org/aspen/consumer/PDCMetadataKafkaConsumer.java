@@ -21,10 +21,10 @@ import java.util.Map;
  * Remedial Kafka Consumer using Spark Streaming
  * <p/>
  * Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>
- *
+ * <p/>
  * From Gateway node Example
  * spark-submit --class org.aspen.consumer.PDCMetadataKafkaConsumer --deploy-mode client --master local[2]
- *   SparkStreamingKafkaConsumer.jar ip-10-6-8-56:2181 metagrp pmumetadatstream 1
+ * SparkStreamingKafkaConsumer.jar ip-10-6-8-56:2181 metagrp pmumetadatstream 1
  *
  * @TODO run on yarn in distributed mode
  */
@@ -33,7 +33,7 @@ public class PDCMetadataKafkaConsumer {
 
     public static void main(String[] args) {
         if (args.length < 4) {
-            System.err.println("Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
+            logError("Usage: PDCMetadataKafkaConsumer <zkQuorum> <group> <topics> <numThreads>");
             System.exit(1);
         }
 
@@ -42,13 +42,36 @@ public class PDCMetadataKafkaConsumer {
         String[] topics = args[2].split(",");
         int numThreads = Integer.valueOf(args[3]);
 
+        if (topics.length == 0) {
+            logError("Usage: Please supply at least one kafka topic.");
+            System.exit(1);
+        }
+
+        _LOG.debug("zkQuorum: " + zkQuorum);
+        _LOG.debug("group: " + kfGrp);
+        _LOG.debug("topic[0]: " + topics[0]);
+        _LOG.debug("threads: " + numThreads);
+
+        if (zkQuorum.indexOf(":") < 2) {
+            logError("Usage: Please supply a proper zkQuorum. Ex: host.name:2181");
+            System.exit(1);
+        }
+
+        if (kfGrp.length() < 1) {
+            logError("Usage: Please supply a proper kafka group name");
+            System.exit(1);
+        }
+
         Map<String, Integer> topicMap = new HashMap<String, Integer>();
         for (String topic : topics) {
             topicMap.put(topic, numThreads);
         }
 
         SparkConf conf = new SparkConf().setAppName("PDCMetadataKafkaConsumer");
-        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(10000));
+        conf.set("spark.ui.port", "4050");
+        _LOG.debug("Set spark to run on port 4050");
+
+        JavaStreamingContext ctx = new JavaStreamingContext(conf, new Duration(1000));
         JavaPairReceiverInputDStream<String, String> kfStream = KafkaUtils.createStream(ctx, zkQuorum, kfGrp, topicMap);
 
         //Filter out un-needed messages
@@ -57,9 +80,10 @@ public class PDCMetadataKafkaConsumer {
         JavaPairDStream<String, String> fStream = kfStream.filter(new Function<Tuple2<String, String>, Boolean>() {
             @Override
             public Boolean call(Tuple2<String, String> tuple) throws Exception {
-                _LOG.debug("LOG: Tuple: " + tuple._1() + ": " + tuple._2());
                 boolean result = tuple._2().length() > 16;
-                System.err.println("Tuple: " + tuple._1() + ": " + tuple._2() + "Result: " + result);
+                if (_LOG.isDebugEnabled()) {
+                    _LOG.debug(String.format("Tuple: %s, Saving to HDFS: %s", tuple._2(), result));
+                }
                 return result;
             }
         });
@@ -68,5 +92,10 @@ public class PDCMetadataKafkaConsumer {
 
         ctx.start();
         ctx.awaitTermination();
+    }
+
+    private static final void logError(String msg) {
+        System.err.println(msg);
+        _LOG.error(msg);
     }
 }
